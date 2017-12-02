@@ -66,6 +66,34 @@ export class GenericApi<TModel> implements IApi<TModel> {
             });
     }
 
+    public post(field: string, data: any, requestOptions?: RequestOptions): Observable<any> {
+
+        const options = requestOptions || new RequestOptions({
+            headers: this.getHeaders()
+        });
+
+        return this.http
+            .post(`${this.apiUrl}/field`, JSON.stringify(data), options)
+            .map((responseData) => {
+
+                if (responseData.status !== 200) {
+                    throw new Error('This request has failed ' + responseData.status);
+                }
+
+                const dataModel = responseData.json() as ServerData<any>;
+
+                if (!dataModel.isSuccess) {
+                    if (responseData.status === 200) {
+                        throw new Error(dataModel.code || dataModel.message || 'failed');
+                    } else {
+                        throw new Error(responseData.status);
+                    }
+                }
+
+                return dataModel.data;
+            });
+    }
+
     private getHeaders(): Headers {
         const headers = new Headers();
         headers.append('Content-Type', 'application/json');
