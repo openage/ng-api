@@ -1,9 +1,10 @@
 {
     "name": "@open-age/ng-api",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "set of classes to consume the restful api",
-    "main": "./src/index.ts",
-    "typings": "./src/index.ts",
+    "main": "./dist/index.js",
+    "typings": "./dist/index.d.ts",
+
     "repository": {
         "type": "git",
         "url": "https://github.com/openage/ng-api.git"

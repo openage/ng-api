@@ -73,7 +73,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
         });
 
         return this.http
-            .post(`${this.apiUrl}/field`, JSON.stringify(data), options)
+            .post(`${this.apiUrl}/${field}`, JSON.stringify(data), options)
             .map((responseData) => {
 
                 if (responseData.status !== 200) {
