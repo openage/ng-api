@@ -100,7 +100,9 @@ export class GenericApi<TModel> implements IApi<TModel> {
         if (this.headers && this.headers.length > 0) {
             this.headers.forEach((item) => {
                 const value = item.value || localStorage.getItem(item.key);
-                headers.append(item.key, value + '');
+                if (value) {
+                    headers.append(item.key, value + '');
+                }
             });
         }
 
