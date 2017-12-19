@@ -17,7 +17,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
         private url: string,
         private key: string,
         private http: Http,
-        private headers?: [{ key: string, value?: string }]) {
+        private headers?: [{ key: string, value?: any }]) {
         this.apiUrl = `${url}/${key}`;
     }
 
@@ -99,7 +99,24 @@ export class GenericApi<TModel> implements IApi<TModel> {
         headers.append('Content-Type', 'application/json');
         if (this.headers && this.headers.length > 0) {
             this.headers.forEach((item) => {
-                const value = item.value || localStorage.getItem(item.key);
+                let value: string;
+                if (item.value) {
+                    switch (typeof item.value) {
+                        case 'string':
+                            value = item.value;
+                            break;
+                        case 'function':
+                            value = item.value();
+                            break;
+
+                        default:
+                            value = JSON.stringify(item.value);
+                            break;
+                    }
+                } else {
+                    value = localStorage.getItem(item.key)
+                }
+
                 if (value) {
                     headers.append(item.key, value + '');
                 }
