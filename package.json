@@ -4,7 +4,11 @@
     "description": "set of classes to consume the restful api",
     "main": "./dist/index.js",
     "typings": "./dist/index.d.ts",
-
+    "scripts": {
+        "test": "test",
+        "release:patch": "npm version patch",
+        "publish": "npm publish --access public"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/openage/ng-api.git"
