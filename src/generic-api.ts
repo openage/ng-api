@@ -17,7 +17,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
         private url: string,
         private key: string,
         private http: Http,
-        private headers?: [{ key: string, value?: any }]) {
+        private headers?: Array<{ key: string, value?: any }>) {
         this.apiUrl = `${url}/${key}`;
     }
 

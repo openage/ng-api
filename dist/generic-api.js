@@ -1,7 +1,7 @@
 import { Headers, RequestOptions } from '@angular/http';
 import 'rxjs/Rx';
 import { Page } from './page.model';
-var GenericApi = (function () {
+var GenericApi = /** @class */ (function () {
     function GenericApi(url, key, http, headers) {
         this.url = url;
         this.key = key;

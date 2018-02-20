@@ -1,4 +1,4 @@
-var PageOptions = (function () {
+var PageOptions = /** @class */ (function () {
     function PageOptions(obj) {
         this.offset = 0;
         this.limit = 10;

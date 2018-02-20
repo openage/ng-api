@@ -1,4 +1,4 @@
-var RemoteData = (function () {
+var RemoteData = /** @class */ (function () {
     function RemoteData() {
     }
     return RemoteData;

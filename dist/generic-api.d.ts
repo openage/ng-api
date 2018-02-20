@@ -11,10 +11,10 @@ export declare class GenericApi<TModel> implements IApi<TModel> {
     private headers;
     private apiUrl;
     private baseUrl;
-    constructor(url: string, key: string, http: Http, headers?: [{
+    constructor(url: string, key: string, http: Http, headers?: Array<{
         key: string;
         value?: any;
-    }]);
+    }>);
     get(id: number | string, hack?: (obj: any) => TModel): Observable<TModel>;
     search(query?: any, options?: PageOptions, hack?: (obj: any) => TModel): Observable<Page<TModel>>;
     create(model: TModel, hack?: (obj: any) => TModel): Observable<TModel>;

@@ -9,7 +9,7 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 import { RemoteData } from './remote-data.model';
-var ServerData = (function (_super) {
+var ServerData = /** @class */ (function (_super) {
     __extends(ServerData, _super);
     function ServerData() {
         return _super !== null && _super.apply(this, arguments) || this;
