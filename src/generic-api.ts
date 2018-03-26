@@ -11,18 +11,17 @@ import { RemoteData } from './remote-data.model';
 
 export class GenericApi<TModel> implements IApi<TModel> {
 
-    private apiUrl: string;
-    private baseUrl: string;
     constructor(
         private url: string,
-        private key: string,
+        private key: any,
         private http: Http,
-        private headers?: Array<{ key: string, value?: any }>) {
-        this.apiUrl = `${url}/${key}`;
+        private headers?: Array<{ key: string, value?: any }>,
+        private extension?: string
+    ) {
     }
 
     public get(id: number | string, hack?: (obj: any) => TModel): Observable<TModel> {
-        const url = this.getObjectUrl(id);
+        const url = this.apiUrl(id);
         const options = { headers: this.getHeaders() };
         return this.http
             .get(url, options)
@@ -40,16 +39,16 @@ export class GenericApi<TModel> implements IApi<TModel> {
         });
 
         return this.http
-            .post(this.apiUrl, JSON.stringify(model), options)
+            .post(this.apiUrl(), JSON.stringify(model), options)
             .map((response) => this.extractModel(response, hack));
     }
     public update(id: number | string, model: TModel, hack?: (obj: any) => TModel): Observable<TModel> {
         return this.http
-            .put(this.getObjectUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
+            .put(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
             .map((response) => this.extractModel(response, hack));
     }
     public remove(id: number | string): Observable<void> {
-        return this.http.delete(this.getObjectUrl(id), { headers: this.getHeaders() })
+        return this.http.delete(this.apiUrl(id), { headers: this.getHeaders() })
             .map((response) => {
                 if (response.status !== 200) {
                     throw new Error('This request has failed ' + response.status);
@@ -73,7 +72,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
         });
 
         return this.http
-            .post(this.apiUrl + '/' + field, JSON.stringify(data), options)
+            .post(this.apiUrl(field), JSON.stringify(data), options)
             .map((responseData) => {
 
                 if (responseData.status !== 200) {
@@ -126,10 +125,28 @@ export class GenericApi<TModel> implements IApi<TModel> {
         return headers;
     }
 
-    private getObjectUrl(id: number | string): string {
-        const url = `${this.apiUrl}/${id}`;
+    private apiUrl(field?: number | string): string {
+        var key: string;
 
-        return url;
+        switch (typeof this.key) {
+            case 'string':
+                key = this.key;
+                break;
+            case 'function':
+                key = this.key();
+                break;
+            default:
+                key = JSON.stringify(this.key);
+                break;
+        }
+
+        let root = `${this.url}/${key}`;
+
+        if (field) {
+            return this.extension ? `${root}/${field}${this.extension}` : `${root}/${field}`;
+        } else {
+            return this.extension ? `${root}${this.extension}` : `${root}`;
+        }
     }
 
     private getSearchUrl(query: any, options?: PageOptions): string {
@@ -143,7 +160,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
         }
 
         const queryString = params.toString();
-        const url = queryString ? `${this.apiUrl}?${queryString}` : this.apiUrl;
+        const url = queryString ? `${this.apiUrl()}?${queryString}` : this.apiUrl();
 
         return url;
     }

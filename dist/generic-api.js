@@ -2,16 +2,16 @@ import { Headers, RequestOptions } from '@angular/http';
 import 'rxjs/Rx';
 import { Page } from './page.model';
 var GenericApi = /** @class */ (function () {
-    function GenericApi(url, key, http, headers) {
+    function GenericApi(url, key, http, headers, extension) {
         this.url = url;
         this.key = key;
         this.http = http;
         this.headers = headers;
-        this.apiUrl = url + "/" + key;
+        this.extension = extension;
     }
     GenericApi.prototype.get = function (id, hack) {
         var _this = this;
-        var url = this.getObjectUrl(id);
+        var url = this.apiUrl(id);
         var options = { headers: this.getHeaders() };
         return this.http
             .get(url, options)
@@ -29,17 +29,17 @@ var GenericApi = /** @class */ (function () {
             headers: this.getHeaders()
         });
         return this.http
-            .post(this.apiUrl, JSON.stringify(model), options)
+            .post(this.apiUrl(), JSON.stringify(model), options)
             .map(function (response) { return _this.extractModel(response, hack); });
     };
     GenericApi.prototype.update = function (id, model, hack) {
         var _this = this;
         return this.http
-            .put(this.getObjectUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
+            .put(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
             .map(function (response) { return _this.extractModel(response, hack); });
     };
     GenericApi.prototype.remove = function (id) {
-        return this.http.delete(this.getObjectUrl(id), { headers: this.getHeaders() })
+        return this.http.delete(this.apiUrl(id), { headers: this.getHeaders() })
             .map(function (response) {
             if (response.status !== 200) {
                 throw new Error('This request has failed ' + response.status);
@@ -60,7 +60,7 @@ var GenericApi = /** @class */ (function () {
             headers: this.getHeaders()
         });
         return this.http
-            .post(this.apiUrl + '/' + field, JSON.stringify(data), options)
+            .post(this.apiUrl(field), JSON.stringify(data), options)
             .map(function (responseData) {
             if (responseData.status !== 200) {
                 throw new Error('This request has failed ' + responseData.status);
@@ -106,9 +106,26 @@ var GenericApi = /** @class */ (function () {
         }
         return headers;
     };
-    GenericApi.prototype.getObjectUrl = function (id) {
-        var url = this.apiUrl + "/" + id;
-        return url;
+    GenericApi.prototype.apiUrl = function (field) {
+        var key;
+        switch (typeof this.key) {
+            case 'string':
+                key = this.key;
+                break;
+            case 'function':
+                key = this.key();
+                break;
+            default:
+                key = JSON.stringify(this.key);
+                break;
+        }
+        var root = this.url + "/" + key;
+        if (field) {
+            return this.extension ? root + "/" + field + this.extension : root + "/" + field;
+        }
+        else {
+            return this.extension ? "" + root + this.extension : "" + root;
+        }
     };
     GenericApi.prototype.getSearchUrl = function (query, options) {
         var params = new URLSearchParams();
@@ -119,7 +136,7 @@ var GenericApi = /** @class */ (function () {
             }
         }
         var queryString = params.toString();
-        var url = queryString ? this.apiUrl + "?" + queryString : this.apiUrl;
+        var url = queryString ? this.apiUrl() + "?" + queryString : this.apiUrl();
         return url;
     };
     GenericApi.prototype.extractModel = function (responseData, hack) {
