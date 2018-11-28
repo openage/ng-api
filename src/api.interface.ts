@@ -11,7 +11,7 @@ export interface IApi<TModel> {
     remove(id: number | string): Observable<void>;
 
     post(model: any, key?: string, hack?: (obj: any) => any): Observable<any>;
-    bulk(models: TModel[], path?: string, hack?: (obj: any) => TModel): Promise<RemoteData>;
-    upload(file: File, format?: string, path?: string): Observable<RemoteData>;
-
+    bulk(models: TModel[], path?: string, hack?: (obj: any) => any): Observable<any>
+    // TODO:
+    // upload(file: File, path?: string, format?: string): Observable<any>;
 }
