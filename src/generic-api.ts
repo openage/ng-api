@@ -54,8 +54,8 @@ export class GenericApi<TModel> implements IApi<TModel> {
                     throw new Error('This request has failed ' + response.status);
                 }
                 const dataModel = response.json().data as RemoteData;
-
-                if (!dataModel.isSuccess) {
+                const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+                if (!isSuccess) {
                     if (response.status === 200) {
                         throw new Error(dataModel.code || dataModel.message || 'failed');
                     } else {
@@ -80,8 +80,8 @@ export class GenericApi<TModel> implements IApi<TModel> {
                 }
 
                 const dataModel = responseData.json() as ServerData<any>;
-
-                if (!dataModel.isSuccess) {
+                const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+                if (!isSuccess) {
                     if (responseData.status === 200) {
                         throw new Error(dataModel.code || dataModel.message || 'failed');
                     } else {
@@ -172,8 +172,8 @@ export class GenericApi<TModel> implements IApi<TModel> {
         }
 
         const dataModel = responseData.json() as ServerData<any>;
-
-        if (!dataModel.isSuccess) {
+        const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        if (!isSuccess) {
             if (responseData.status === 200) {
                 throw new Error(dataModel.code || dataModel.message || 'failed');
             } else {
@@ -192,8 +192,8 @@ export class GenericApi<TModel> implements IApi<TModel> {
         }
 
         const dataModel = responseData.json() as Page<any>;
-
-        if (!dataModel.isSuccess) {
+        const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        if (!isSuccess) {
             if (responseData.status === 200) {
                 throw new Error(dataModel.code || dataModel.message || 'failed');
             } else {
@@ -201,16 +201,17 @@ export class GenericApi<TModel> implements IApi<TModel> {
             }
         }
 
+        var data = dataModel['data'] || dataModel;
         const items: TModel[] = [];
-        dataModel.items.forEach((item) => {
+        data.items.forEach((item) => {
             items.push(hack ? hack(item) : item as TModel);
         });
 
         const page: Page<TModel> = new Page<TModel>();
-        page.pageNo = dataModel.pageNo;
-        page.pageSize = dataModel.pageSize;
-        page.total = dataModel.total;
-        page.stats = dataModel.stats;
+        page.pageNo = data.pageNo;
+        page.pageSize = data.pageSize;
+        page.total = data.total;
+        page.stats = data.stats;
         page.items = items;
 
         return page;

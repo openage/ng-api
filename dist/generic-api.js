@@ -45,7 +45,8 @@ var GenericApi = /** @class */ (function () {
                 throw new Error('This request has failed ' + response.status);
             }
             var dataModel = response.json().data;
-            if (!dataModel.isSuccess) {
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+            if (!isSuccess) {
                 if (response.status === 200) {
                     throw new Error(dataModel.code || dataModel.message || 'failed');
                 }
@@ -66,7 +67,8 @@ var GenericApi = /** @class */ (function () {
                 throw new Error('This request has failed ' + responseData.status);
             }
             var dataModel = responseData.json();
-            if (!dataModel.isSuccess) {
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+            if (!isSuccess) {
                 if (responseData.status === 200) {
                     throw new Error(dataModel.code || dataModel.message || 'failed');
                 }
@@ -144,7 +146,8 @@ var GenericApi = /** @class */ (function () {
             throw new Error('This request has failed ' + responseData.status);
         }
         var dataModel = responseData.json();
-        if (!dataModel.isSuccess) {
+        var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        if (!isSuccess) {
             if (responseData.status === 200) {
                 throw new Error(dataModel.code || dataModel.message || 'failed');
             }
@@ -159,7 +162,8 @@ var GenericApi = /** @class */ (function () {
             throw new Error('This request has failed ' + responseData.status);
         }
         var dataModel = responseData.json();
-        if (!dataModel.isSuccess) {
+        var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        if (!isSuccess) {
             if (responseData.status === 200) {
                 throw new Error(dataModel.code || dataModel.message || 'failed');
             }
@@ -167,15 +171,16 @@ var GenericApi = /** @class */ (function () {
                 throw new Error(responseData.status + '');
             }
         }
+        var data = dataModel['data'] || dataModel;
         var items = [];
-        dataModel.items.forEach(function (item) {
+        data.items.forEach(function (item) {
             items.push(hack ? hack(item) : item);
         });
         var page = new Page();
-        page.pageNo = dataModel.pageNo;
-        page.pageSize = dataModel.pageSize;
-        page.total = dataModel.total;
-        page.stats = dataModel.stats;
+        page.pageNo = data.pageNo;
+        page.pageSize = data.pageSize;
+        page.total = data.total;
+        page.stats = data.stats;
         page.items = items;
         return page;
     };

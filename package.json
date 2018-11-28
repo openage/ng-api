@@ -1,11 +1,12 @@
 {
     "name": "@open-age/ng-api",
-    "version": "0.0.10",
+    "version": "1.1.0",
     "description": "set of classes to consume the restful api",
     "main": "./dist/index.js",
     "typings": "./dist/index.d.ts",
     "scripts": {
         "test": "test",
+        "build": "tsc",
         "release:patch": "npm version patch",
         "publish": "npm publish --access public"
     },
