@@ -21,6 +21,7 @@ export declare class GenericApi<TModel> implements IApi<TModel> {
     remove(id: number | string): Observable<void>;
     post(data: any, field: string, hack?: (obj: any) => any): Observable<any>;
     bulk(models: TModel[], path?: string, hack?: (obj: any) => any): Observable<any>;
+    upload(file: File, path?: string, query?: any): Observable<any>;
     private getHeaders();
     private apiUrl(field?);
     private getSearchUrl(query, options?);

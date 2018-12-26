@@ -12,6 +12,5 @@ export interface IApi<TModel> {
 
     post(model: any, key?: string, hack?: (obj: any) => any): Observable<any>;
     bulk(models: TModel[], path?: string, hack?: (obj: any) => any): Observable<any>
-    // TODO:
-    // upload(file: File, path?: string, format?: string): Observable<any>;
+    upload(file: File, path?: string, query?: any): Observable<any>;
 }

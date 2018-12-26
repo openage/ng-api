@@ -8,8 +8,7 @@ import { Page } from './page.model';
 import { PageOptions } from './page-options.model';
 import { RemoteData } from './remote-data.model';
 
-// TODO:
-// import { FileUploader, FileItem } from 'ng2-file-upload';
+import { FileUploader, FileItem } from 'ng2-file-upload';
 
 export class GenericApi<TModel> implements IApi<TModel> {
 
@@ -109,65 +108,65 @@ export class GenericApi<TModel> implements IApi<TModel> {
             .map((response) => this.extractPage(response, hack));
     }
 
-    /*
-        TODO:
-        public upload(file: File, path?: string, format?: string): Observable<any> {
-    
-            let url = this.apiUrl(path || 'bulk');
-    
-            if (format) {
-                url = `${url}?format=${format}`;
+    public upload(file: File, path?: string, query?: any): Observable<any> {
+        const params = new URLSearchParams();
+        for (let key in query) {
+            if (query[key]) {
+                params.set(key, query[key]);
             }
-    
-            const headers = [];
-    
-            this.getHeaders().forEach((values, name) => {
-                if (name === 'Content-Type') {
-                    return;
-                }
-                values.forEach(value => {
-                    headers.push({
-                        name: name,
-                        value: value
-                    })
-                });
-            })
-    
-            const uploader = new FileUploader({
-                url: url,
-                headers: headers,
-                autoUpload: true
-            });
-    
-            uploader.onBeforeUploadItem = (item) => {
-                item.withCredentials = false;
-            }
-    
-            let subject = new Subject<any>();
-    
-            uploader.onErrorItem = (item: FileItem, response: string, status: number) => {
-                subject.error(new Error('failed'));
-            }
-    
-            uploader.onCompleteItem = (item: FileItem, response: string, status: number) => {
-                const dataModel = JSON.parse(response) as ServerData<any>;
-                const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
-                if (!isSuccess) {
-                    if (status === 200) {
-                        subject.error(dataModel.code || dataModel.message || 'failed');
-                    } else {
-                        subject.error('' + status);
-                    }
-                } else {
-                    subject.next(dataModel.message)
-                }
-            }
-    
-            uploader.addToQueue([file]);
-    
-            return subject.asObservable()
         }
-    */
+        const queryString = params.toString();
+        const url = queryString ? `${this.apiUrl(path)}?${queryString}` : this.apiUrl(path);
+
+        const headers = [];
+
+        this.getHeaders().forEach((values, name) => {
+            if (name === 'Content-Type') {
+                return;
+            }
+            values.forEach(value => {
+                headers.push({
+                    name: name,
+                    value: value
+                })
+            });
+        })
+
+        const uploader = new FileUploader({
+            url: url,
+            headers: headers,
+            autoUpload: true
+        });
+
+        uploader.onBeforeUploadItem = (item) => {
+            item.withCredentials = false;
+        }
+
+        let subject = new Subject<any>();
+
+        uploader.onErrorItem = (item: FileItem, response: string, status: number) => {
+            subject.error(new Error('failed'));
+        }
+
+        uploader.onCompleteItem = (item: FileItem, response: string, status: number) => {
+            const dataModel = JSON.parse(response) as ServerData<any>;
+            const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+            if (!isSuccess) {
+                if (status === 200) {
+                    subject.error(dataModel.code || dataModel.message || 'failed');
+                } else {
+                    subject.error('' + status);
+                }
+            } else {
+                subject.next(dataModel.data)
+            }
+        }
+
+        uploader.addToQueue([file]);
+
+        return subject.asObservable()
+    }
+
     private getHeaders(): Headers {
         const headers = new Headers();
         headers.append('Content-Type', 'application/json');

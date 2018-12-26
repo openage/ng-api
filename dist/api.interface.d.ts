@@ -9,4 +9,5 @@ export interface IApi<TModel> {
     remove(id: number | string): Observable<void>;
     post(model: any, key?: string, hack?: (obj: any) => any): Observable<any>;
     bulk(models: TModel[], path?: string, hack?: (obj: any) => any): Observable<any>;
+    upload(file: File, path?: string, query?: any): Observable<any>;
 }
