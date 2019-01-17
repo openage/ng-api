@@ -1,8 +1,8 @@
 import { RemoteData } from './remote-data.model';
 export declare class Page<TModel> extends RemoteData {
-    pageNo: number;
-    pageSize: number;
-    total: number;
-    items: TModel[];
+    pageNo: number | undefined;
+    pageSize: number | undefined;
+    total: number | undefined;
+    items: TModel[] | undefined;
     stats: any;
 }

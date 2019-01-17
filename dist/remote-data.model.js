@@ -4,4 +4,4 @@ var RemoteData = /** @class */ (function () {
     return RemoteData;
 }());
 export { RemoteData };
-//# sourceMappingURL=remote-data.model.js.map
+//# sourceMappingURL=../src/dist/remote-data.model.js.map

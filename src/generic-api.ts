@@ -1,111 +1,231 @@
-import { Injectable, isDevMode } from '@angular/core';
-import { Http, Headers, RequestOptions, Response } from '@angular/http';
-import 'rxjs/Rx';
-import { Observable, Subject } from 'rxjs/Rx';
-import { IApi } from './api.interface';
-import { ServerData } from './server-data.model';
-import { Page } from './page.model';
-import { PageOptions } from './page-options.model';
-import { RemoteData } from './remote-data.model';
 
-import { FileUploader, FileItem } from 'ng2-file-upload';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { FileItem, FileUploader } from 'ng2-file-upload';
+import { Observable, Subject, timer, Subscription } from 'rxjs';
+import { IApi } from './api.interface';
+import { PageOptions } from './page-options.model';
+import { Page } from './page.model';
+import { RemoteData } from './remote-data.model';
+import { ServerData } from './server-data.model';
+
+import { Headers } from 'ng2-file-upload'
+import { ErrorHandler } from '@angular/core';
+import moment from 'moment';
+
 
 export class GenericApi<TModel> implements IApi<TModel> {
 
     constructor(
+        private http: HttpClient,
         private url: string,
-        private key: any,
-        private http: Http,
-        private headers?: Array<{ key: string, value?: any }>,
-        private extension?: string
+        private options?: {
+            collection?: any,
+            headers?: Array<{ key: string, value?: any }>,
+            map?: (obj: any) => TModel
+            extension?: string,
+            errorHandler?: ErrorHandler
+        }
     ) {
+        this.options = this.options || {}
     }
 
-    public get(id: number | string, hack?: (obj: any) => TModel): Observable<TModel> {
-        const url = this.apiUrl(id);
-        const options = { headers: this.getHeaders() };
-        return this.http
-            .get(url, options)
-            .map((response) => this.extractModel(response, hack));
-    }
-    public search(query?: any, options?: PageOptions, hack?: (obj: any) => TModel): Observable<Page<TModel>> {
-        return this.http
-            .get(this.getSearchUrl(query, options), { headers: this.getHeaders() })
-            .map((response) => this.extractPage(response, hack));
-    }
-    public create(model: TModel, hack?: (obj: any) => TModel): Observable<TModel> {
+    public get(id: number | string, options?: {
+        watch?: number
+        offline?: boolean,
+        timeStamp?: Date,
+        map?: (obj: any) => TModel
+    }): Observable<TModel> {
+        options = options || {}
+        const subject = new Subject<TModel>();
 
-        const options = new RequestOptions({
-            headers: this.getHeaders()
+        let timeStamp: Date = options.timeStamp;
+        const ticker = (options.watch ? timer(0, options.watch) : timer(0)).subscribe(() => {
+            const url = this.apiUrl(id);
+            let requestTime = new Date();
+            const request = this.http
+                .get<ServerData<TModel>>(url, { headers: this.getHeaders(timeStamp) })
+                .subscribe(
+                    dataModel => {
+                        try {
+
+                            const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
+                            if (!isSuccess) {
+                                let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
+                                return this.handleError(error, subject, request)
+                            }
+
+                            let model;
+
+                            if (options && options.map) {
+                                model = options.map(dataModel.data)
+                            } else if (this.options.map) {
+                                model = this.options.map(dataModel.data)
+                            } else {
+                                model = dataModel.data
+                            }
+
+                            if (!model && timeStamp) {
+                                return;
+                            }
+
+                            if (model && (model as any)['timeStamp']) {
+                                let modelTimeStamp = (model as any)['timeStamp'];
+
+                                if (!timeStamp || !moment(timeStamp).isSame(modelTimeStamp, 'millisecond')) {
+                                    timeStamp = moment(modelTimeStamp).toDate();
+                                    return subject.next(model);
+                                } else {
+                                    return
+                                }
+                            }
+
+                            timeStamp = requestTime;
+                            subject.next(model);
+                        } catch (err) {
+                            this.handleError(err, subject)
+                        }
+                    },
+                    err => {
+                        if (err.status === 304) { // Not Modified
+                            // its ok - we need not let user know anything
+                            return;
+                        }
+                        this.handleError(err, subject)
+                    });
+
+            if (!subject.observers || !subject.observers.length) {
+                ticker.unsubscribe();
+                request.unsubscribe();
+                return;
+            }
+        })
+        return subject.asObservable();
+    }
+    public search(query?: any, options?: {
+        offset?: number,
+        limit?: number,
+        offline?: boolean,
+        map?: (obj: any) => TModel
+    } | PageOptions): Observable<Page<TModel>> {
+        options = options || {}
+        let headers = this.getHeaders()
+        let pageOptions = new PageOptions({
+            offset: options.offset,
+            limit: options.limit
         });
 
-        return this.http
-            .post(this.apiUrl(), JSON.stringify(model), options)
-            .map((response) => this.extractModel(response, hack));
+        let mapper = options instanceof PageOptions ? null : options.map
+
+        const subject = new Subject<Page<TModel>>();
+
+        let request = this.http
+            .get<Page<TModel>>(this.getSearchUrl(query, pageOptions), { headers: headers })
+            .subscribe(
+                response => this.extractPage(response, { map: mapper }, subject, request),
+                err => this.handleError(err, subject, request))
+        return subject.asObservable();
     }
-    public update(id: number | string, model: TModel, hack?: (obj: any) => TModel): Observable<TModel> {
-        return this.http
-            .put(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
-            .map((response) => this.extractModel(response, hack));
+    public create(model: TModel, options?: {
+        offline?: boolean,
+        map?: (obj: any) => TModel
+    }): Observable<TModel> {
+
+        options = options || {}
+        const subject = new Subject<TModel>();
+
+        let request = this.http
+            .post<ServerData<TModel>>(this.apiUrl(), JSON.stringify(model), { headers: this.getHeaders() })
+            .subscribe(
+                response => this.extractModel(response, options, subject, request),
+                err => this.handleError(err, subject, request))
+        return subject.asObservable();
     }
-    public remove(id: number | string): Observable<void> {
-        return this.http.delete(this.apiUrl(id), { headers: this.getHeaders() })
-            .map((response) => {
-                if (response.status !== 200) {
-                    throw new Error('This request has failed ' + response.status);
-                }
-                const dataModel = response.json().data as RemoteData;
-                const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
-                if (!isSuccess) {
-                    if (response.status === 200) {
-                        throw new Error(dataModel.code || dataModel.message || 'failed');
-                    } else {
-                        throw new Error(response.status + '');
+    public update(id: number | string, model: TModel, options?: {
+        offline?: boolean,
+        map?: (obj: any) => TModel
+    }): Observable<TModel> {
+        options = options || {}
+        const subject = new Subject<TModel>();
+
+        let request = this.http
+            .put<ServerData<TModel>>(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
+            .subscribe(
+                response => this.extractModel(response, options, subject, request),
+                err => this.handleError(err, subject, request))
+        return subject.asObservable();
+    }
+    public remove(id: number | string, options?: {
+        offline?: boolean
+    }): Observable<void> {
+        options = options || {}
+        const subject = new Subject<void>();
+
+        let request = this.http
+            .delete<RemoteData>(this.apiUrl(id), { headers: this.getHeaders() })
+            .subscribe(
+                dataModel => {
+                    if (!subject.observers || !subject.observers.length) {
+                        request.unsubscribe();
+                        return;
                     }
-                }
-            });
-    }
-
-    public post(data: any, field: string, hack?: (obj: any) => any): Observable<any> {
-
-        const options = new RequestOptions({
-            headers: this.getHeaders()
-        });
-
-        return this.http
-            .post(this.apiUrl(field), JSON.stringify(data), options)
-            .map((responseData) => {
-
-                if (responseData.status !== 200) {
-                    throw new Error('This request has failed ' + responseData.status);
-                }
-
-                const dataModel = responseData.json() as ServerData<any>;
-                const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
-                if (!isSuccess) {
-                    if (responseData.status === 200) {
-                        throw new Error(dataModel.code || dataModel.message || 'failed');
-                    } else {
-                        throw new Error(responseData.status);
+                    const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
+                    if (isSuccess) {
+                        return subject.next();
                     }
-                }
 
-                if (hack) {
-                    return hack(dataModel.data);
-                }
+                    let err = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                    this.handleError(err, subject)
+                },
+                err => this.handleError(err, subject, request))
+        return subject.asObservable();
 
-                return dataModel.data;
-            });
     }
 
-    public bulk(models: TModel[], path?: string, hack?: (obj: any) => any): Observable<any> {
-        const options = new RequestOptions({
-            headers: this.getHeaders()
-        });
+    public post(data: any, field: string, options?: {
+        map?: (obj: any) => any
+    }): Observable<any> {
 
-        return this.http
-            .post(this.apiUrl(path || 'bulk'), JSON.stringify({ items: models }), options)
-            .map((response) => this.extractPage(response, hack));
+        options = options || {}
+
+        const subject = new Subject<any>();
+
+        let request = this.http
+            .post<ServerData<any>>(this.apiUrl(field), JSON.stringify(data), { headers: this.getHeaders() })
+            .subscribe(
+                dataModel => {
+                    if (this.shouldHandle(subject, request)) {
+                        return
+                    }
+                    const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
+
+                    if (isSuccess) {
+                        subject.next(options.map ? options.map(dataModel.data) : dataModel.data)
+                    }
+                    let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                    this.handleError(error, subject)
+                },
+                err => this.handleError(err, subject, request))
+        return subject.asObservable();
+    }
+
+    public bulk(models: TModel[], path?: string, options?: {
+        map?: (obj: any) => TModel
+    }): Observable<any> {
+        options = options || {}
+        const subject = new Subject<any>();
+
+        let request = this.http
+            .post<Page<TModel>>(this.apiUrl(path || 'bulk'), JSON.stringify({ items: models }), { headers: this.getHeaders() })
+            .subscribe(
+                response => {
+                    try {
+                        this.extractPage(response, options, subject, request)
+                    } catch (err) {
+                        this.handleError(err, subject, request)
+                    }
+                },
+                err => this.handleError(err, subject, request))
+        return subject.asObservable();
     }
 
     public upload(file: File, path?: string, query?: any): Observable<any> {
@@ -118,19 +238,21 @@ export class GenericApi<TModel> implements IApi<TModel> {
         const queryString = params.toString();
         const url = queryString ? `${this.apiUrl(path)}?${queryString}` : this.apiUrl(path);
 
-        const headers = [];
+        const headers: Headers[] = [];
 
-        this.getHeaders().forEach((values, name) => {
-            if (name === 'Content-Type') {
-                return;
+        const httpHeaders = this.getHeaders();
+        for (const name of httpHeaders.keys()) {
+            let value = httpHeaders.get(name);
+
+            if (name === 'Content-Type' || !value) {
+                continue;
             }
-            values.forEach(value => {
-                headers.push({
-                    name: name,
-                    value: value
-                })
-            });
-        })
+
+            headers.push({
+                name: name,
+                value: value
+            })
+        }
 
         const uploader = new FileUploader({
             url: url,
@@ -145,18 +267,17 @@ export class GenericApi<TModel> implements IApi<TModel> {
         let subject = new Subject<any>();
 
         uploader.onErrorItem = (item: FileItem, response: string, status: number) => {
-            subject.error(new Error('failed'));
+            let error = new Error('failed')
+            this.handleError(error, subject)
         }
 
         uploader.onCompleteItem = (item: FileItem, response: string, status: number) => {
             const dataModel = JSON.parse(response) as ServerData<any>;
-            const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+            const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
+
             if (!isSuccess) {
-                if (status === 200) {
-                    subject.error(dataModel.code || dataModel.message || 'failed');
-                } else {
-                    subject.error('' + status);
-                }
+                let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
+                this.handleError(error, subject)
             } else {
                 subject.next(dataModel.data)
             }
@@ -167,12 +288,17 @@ export class GenericApi<TModel> implements IApi<TModel> {
         return subject.asObservable()
     }
 
-    private getHeaders(): Headers {
-        const headers = new Headers();
-        headers.append('Content-Type', 'application/json');
-        if (this.headers && this.headers.length > 0) {
-            this.headers.forEach((item) => {
-                let value: string;
+    private getHeaders(timeStamp?: Date): HttpHeaders {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        if (timeStamp) {
+            headers['If-Modified-Since'] = timeStamp.toISOString()
+        }
+        if (this.options.headers && this.options.headers.length > 0) {
+            this.options.headers.forEach((item) => {
+                let value: string | null;
                 if (item.value) {
                     switch (typeof item.value) {
                         case 'string':
@@ -191,36 +317,45 @@ export class GenericApi<TModel> implements IApi<TModel> {
                 }
 
                 if (value) {
-                    headers.append(item.key, value + '');
+                    headers[item.key] = value;
                 }
             });
         }
 
-        return headers;
+        return new HttpHeaders(headers);
     }
 
     private apiUrl(field?: number | string): string {
-        var key: string;
+        let url = this.url
 
-        switch (typeof this.key) {
-            case 'string':
-                key = this.key;
-                break;
-            case 'function':
-                key = this.key();
-                break;
-            default:
-                key = JSON.stringify(this.key);
-                break;
+        if (this.options.collection) {
+
+            var key: string;
+
+            switch (typeof this.options.collection) {
+                case 'string':
+                    key = this.options.collection;
+                    break;
+                case 'function':
+                    key = this.options.collection();
+                    break;
+                default:
+                    key = JSON.stringify(this.options.collection);
+                    break;
+            }
+
+            url = `${url}/${key}`;
         }
-
-        let root = `${this.url}/${key}`;
 
         if (field) {
-            return this.extension ? `${root}/${field}${this.extension}` : `${root}/${field}`;
-        } else {
-            return this.extension ? `${root}${this.extension}` : `${root}`;
+            url = `${url}/${field}`;
         }
+
+        if (this.options.extension) {
+            url = `${url}.${this.options.extension}`;
+        }
+
+        return url;
     }
 
     private getSearchUrl(query: any, options?: PageOptions): string {
@@ -239,46 +374,60 @@ export class GenericApi<TModel> implements IApi<TModel> {
         return url;
     }
 
-    private extractModel(responseData: Response, hack?: (obj: any) => TModel): TModel {
+    private extractModel(
+        dataModel: ServerData<TModel>,
+        options: { map?: (obj: any) => TModel },
+        subject: Subject<TModel>,
+        request: Subscription) {
+        options = options || {}
 
-        if (responseData.status !== 200) {
-            throw new Error('This request has failed ' + responseData.status);
+        if (!this.shouldHandle(subject, request)) {
+            return;
         }
 
-        const dataModel = responseData.json() as ServerData<any>;
-        const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
         if (!isSuccess) {
-            if (responseData.status === 200) {
-                throw new Error(dataModel.code || dataModel.message || 'failed');
-            } else {
-                throw new Error(responseData.status);
-            }
+            let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
+            return this.handleError(error, subject, request)
         }
 
-        return hack ? hack(dataModel.data) : dataModel.data as TModel;
+        if (options && options.map) {
+            return subject.next(options.map(dataModel.data))
+        }
 
+        if (this.options.map) {
+            return subject.next(this.options.map(dataModel.data))
+        }
+
+        return subject.next(dataModel.data as TModel);
     }
 
-    private extractPage(responseData: Response, hack?: (obj: any) => TModel): Page<TModel> {
+    private extractPage(
+        dataModel: Page<TModel>,
+        options: { map?: (obj: any) => TModel },
+        subject: Subject<Page<TModel>>,
+        request?: Subscription) {
 
-        if (responseData.status !== 200) {
-            throw new Error('This request has failed ' + responseData.status);
+        if (!this.shouldHandle(subject, request)) {
+            return;
         }
-
-        const dataModel = responseData.json() as Page<any>;
-        const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        options = options || {}
+        const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
         if (!isSuccess) {
-            if (responseData.status === 200) {
-                throw new Error(dataModel.code || dataModel.message || 'failed');
-            } else {
-                throw new Error(responseData.status + '');
-            }
+            let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
+            return this.handleError(error, subject)
         }
 
-        var data = dataModel['data'] || dataModel;
+        var data = (dataModel as any)['data'] || dataModel;
         const items: TModel[] = [];
-        data.items.forEach((item) => {
-            items.push(hack ? hack(item) : item as TModel);
+        data.items.forEach((item: TModel) => {
+            if (options.map) {
+                items.push(options.map(item))
+            } else if (this.options.map) {
+                items.push(this.options.map(item))
+            } else {
+                items.push(item as TModel);
+            }
         });
 
         const page: Page<TModel> = new Page<TModel>();
@@ -288,7 +437,32 @@ export class GenericApi<TModel> implements IApi<TModel> {
         page.stats = data.stats;
         page.items = items;
 
-        return page;
+        return subject.next(page)
+    }
+
+    private handleError(err: any, subject: Subject<any>, request?: Subscription) {
+        if (!this.shouldHandle(subject, request)) {
+            return;
+        }
+
+        if (this.options.errorHandler) {
+            this.options.errorHandler.handleError(err);
+        }
+        subject.error(err)
+    }
+
+    private shouldHandle(subject: Subject<any>, request?: Subscription): boolean {
+        if (!subject) {
+            return false;
+        }
+        if (!subject.observers || !subject.observers.length) {
+            if (request) {
+                request.unsubscribe();
+            }
+            return false;
+        }
+
+        return true;
 
     }
 }

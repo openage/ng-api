@@ -19,4 +19,4 @@ var PageOptions = /** @class */ (function () {
     return PageOptions;
 }());
 export { PageOptions };
-//# sourceMappingURL=page-options.model.js.map
+//# sourceMappingURL=../src/dist/page-options.model.js.map

@@ -1,5 +1,6 @@
 export declare class RemoteData {
-    isSuccess: boolean;
-    code: string;
-    message: string;
+    isSuccess: boolean | undefined;
+    code: string | undefined;
+    error: string | undefined;
+    message: string | undefined;
 }

@@ -1,30 +1,58 @@
-import { Http } from '@angular/http';
-import 'rxjs/Rx';
-import { Observable } from 'rxjs/Rx';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { IApi } from './api.interface';
-import { Page } from './page.model';
 import { PageOptions } from './page-options.model';
+import { Page } from './page.model';
+import { ErrorHandler } from '@angular/core';
 export declare class GenericApi<TModel> implements IApi<TModel> {
-    private url;
-    private key;
     private http;
-    private headers;
-    private extension;
-    constructor(url: string, key: any, http: Http, headers?: Array<{
-        key: string;
-        value?: any;
-    }>, extension?: string);
-    get(id: number | string, hack?: (obj: any) => TModel): Observable<TModel>;
-    search(query?: any, options?: PageOptions, hack?: (obj: any) => TModel): Observable<Page<TModel>>;
-    create(model: TModel, hack?: (obj: any) => TModel): Observable<TModel>;
-    update(id: number | string, model: TModel, hack?: (obj: any) => TModel): Observable<TModel>;
-    remove(id: number | string): Observable<void>;
-    post(data: any, field: string, hack?: (obj: any) => any): Observable<any>;
-    bulk(models: TModel[], path?: string, hack?: (obj: any) => any): Observable<any>;
+    private url;
+    private options?;
+    constructor(http: HttpClient, url: string, options?: {
+        collection?: any;
+        headers?: Array<{
+            key: string;
+            value?: any;
+        }>;
+        map?: (obj: any) => TModel;
+        extension?: string;
+        errorHandler?: ErrorHandler;
+    });
+    get(id: number | string, options?: {
+        watch?: number;
+        offline?: boolean;
+        timeStamp?: Date;
+        map?: (obj: any) => TModel;
+    }): Observable<TModel>;
+    search(query?: any, options?: {
+        offset?: number;
+        limit?: number;
+        offline?: boolean;
+        map?: (obj: any) => TModel;
+    } | PageOptions): Observable<Page<TModel>>;
+    create(model: TModel, options?: {
+        offline?: boolean;
+        map?: (obj: any) => TModel;
+    }): Observable<TModel>;
+    update(id: number | string, model: TModel, options?: {
+        offline?: boolean;
+        map?: (obj: any) => TModel;
+    }): Observable<TModel>;
+    remove(id: number | string, options?: {
+        offline?: boolean;
+    }): Observable<void>;
+    post(data: any, field: string, options?: {
+        map?: (obj: any) => any;
+    }): Observable<any>;
+    bulk(models: TModel[], path?: string, options?: {
+        map?: (obj: any) => TModel;
+    }): Observable<any>;
     upload(file: File, path?: string, query?: any): Observable<any>;
-    private getHeaders();
-    private apiUrl(field?);
-    private getSearchUrl(query, options?);
-    private extractModel(responseData, hack?);
-    private extractPage(responseData, hack?);
+    private getHeaders;
+    private apiUrl;
+    private getSearchUrl;
+    private extractModel;
+    private extractPage;
+    private handleError;
+    private shouldHandle;
 }

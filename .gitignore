@@ -16,6 +16,7 @@ pubspec.lock
 .vscode
 modules/.settings
 modules/.vscode
+src/*.js
 
 # Don't check in secret files
 *secret.js

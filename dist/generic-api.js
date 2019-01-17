@@ -1,99 +1,167 @@
-import { Headers, RequestOptions } from '@angular/http';
-import 'rxjs/Rx';
-import { Subject } from 'rxjs/Rx';
-import { Page } from './page.model';
+import { HttpHeaders } from '@angular/common/http';
 import { FileUploader } from 'ng2-file-upload';
+import { Subject, timer } from 'rxjs';
+import { PageOptions } from './page-options.model';
+import { Page } from './page.model';
+import moment from 'moment';
 var GenericApi = /** @class */ (function () {
-    function GenericApi(url, key, http, headers, extension) {
-        this.url = url;
-        this.key = key;
+    function GenericApi(http, url, options) {
         this.http = http;
-        this.headers = headers;
-        this.extension = extension;
+        this.url = url;
+        this.options = options;
+        this.options = this.options || {};
     }
-    GenericApi.prototype.get = function (id, hack) {
+    GenericApi.prototype.get = function (id, options) {
         var _this = this;
-        var url = this.apiUrl(id);
-        var options = { headers: this.getHeaders() };
-        return this.http
-            .get(url, options)
-            .map(function (response) { return _this.extractModel(response, hack); });
-    };
-    GenericApi.prototype.search = function (query, options, hack) {
-        var _this = this;
-        return this.http
-            .get(this.getSearchUrl(query, options), { headers: this.getHeaders() })
-            .map(function (response) { return _this.extractPage(response, hack); });
-    };
-    GenericApi.prototype.create = function (model, hack) {
-        var _this = this;
-        var options = new RequestOptions({
-            headers: this.getHeaders()
+        options = options || {};
+        var subject = new Subject();
+        var timeStamp = options.timeStamp;
+        var ticker = (options.watch ? timer(0, options.watch) : timer(0)).subscribe(function () {
+            var url = _this.apiUrl(id);
+            var requestTime = new Date();
+            var request = _this.http
+                .get(url, { headers: _this.getHeaders(timeStamp) })
+                .subscribe(function (dataModel) {
+                try {
+                    var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
+                    if (!isSuccess) {
+                        var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                        return _this.handleError(error, subject, request);
+                    }
+                    var model = void 0;
+                    if (options && options.map) {
+                        model = options.map(dataModel.data);
+                    }
+                    else if (_this.options.map) {
+                        model = _this.options.map(dataModel.data);
+                    }
+                    else {
+                        model = dataModel.data;
+                    }
+                    if (!model && timeStamp) {
+                        return;
+                    }
+                    if (model && model['timeStamp']) {
+                        var modelTimeStamp = model['timeStamp'];
+                        if (!timeStamp || !moment(timeStamp).isSame(modelTimeStamp, 'millisecond')) {
+                            timeStamp = moment(modelTimeStamp).toDate();
+                            return subject.next(model);
+                        }
+                        else {
+                            return;
+                        }
+                    }
+                    timeStamp = requestTime;
+                    subject.next(model);
+                }
+                catch (err) {
+                    _this.handleError(err, subject);
+                }
+            }, function (err) {
+                if (err.status === 304) { // Not Modified
+                    // its ok - we need not let user know anything
+                    return;
+                }
+                _this.handleError(err, subject);
+            });
+            if (!subject.observers || !subject.observers.length) {
+                ticker.unsubscribe();
+                request.unsubscribe();
+                return;
+            }
         });
-        return this.http
-            .post(this.apiUrl(), JSON.stringify(model), options)
-            .map(function (response) { return _this.extractModel(response, hack); });
+        return subject.asObservable();
     };
-    GenericApi.prototype.update = function (id, model, hack) {
+    GenericApi.prototype.search = function (query, options) {
         var _this = this;
-        return this.http
+        options = options || {};
+        var headers = this.getHeaders();
+        var pageOptions = new PageOptions({
+            offset: options.offset,
+            limit: options.limit
+        });
+        var mapper = options instanceof PageOptions ? null : options.map;
+        var subject = new Subject();
+        var request = this.http
+            .get(this.getSearchUrl(query, pageOptions), { headers: headers })
+            .subscribe(function (response) { return _this.extractPage(response, { map: mapper }, subject, request); }, function (err) { return _this.handleError(err, subject, request); });
+        return subject.asObservable();
+    };
+    GenericApi.prototype.create = function (model, options) {
+        var _this = this;
+        options = options || {};
+        var subject = new Subject();
+        var request = this.http
+            .post(this.apiUrl(), JSON.stringify(model), { headers: this.getHeaders() })
+            .subscribe(function (response) { return _this.extractModel(response, options, subject, request); }, function (err) { return _this.handleError(err, subject, request); });
+        return subject.asObservable();
+    };
+    GenericApi.prototype.update = function (id, model, options) {
+        var _this = this;
+        options = options || {};
+        var subject = new Subject();
+        var request = this.http
             .put(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
-            .map(function (response) { return _this.extractModel(response, hack); });
+            .subscribe(function (response) { return _this.extractModel(response, options, subject, request); }, function (err) { return _this.handleError(err, subject, request); });
+        return subject.asObservable();
     };
-    GenericApi.prototype.remove = function (id) {
-        return this.http.delete(this.apiUrl(id), { headers: this.getHeaders() })
-            .map(function (response) {
-            if (response.status !== 200) {
-                throw new Error('This request has failed ' + response.status);
-            }
-            var dataModel = response.json().data;
-            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
-            if (!isSuccess) {
-                if (response.status === 200) {
-                    throw new Error(dataModel.code || dataModel.message || 'failed');
-                }
-                else {
-                    throw new Error(response.status + '');
-                }
-            }
-        });
-    };
-    GenericApi.prototype.post = function (data, field, hack) {
-        var options = new RequestOptions({
-            headers: this.getHeaders()
-        });
-        return this.http
-            .post(this.apiUrl(field), JSON.stringify(data), options)
-            .map(function (responseData) {
-            if (responseData.status !== 200) {
-                throw new Error('This request has failed ' + responseData.status);
-            }
-            var dataModel = responseData.json();
-            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
-            if (!isSuccess) {
-                if (responseData.status === 200) {
-                    throw new Error(dataModel.code || dataModel.message || 'failed');
-                }
-                else {
-                    throw new Error(responseData.status);
-                }
-            }
-            if (hack) {
-                return hack(dataModel.data);
-            }
-            return dataModel.data;
-        });
-    };
-    GenericApi.prototype.bulk = function (models, path, hack) {
+    GenericApi.prototype.remove = function (id, options) {
         var _this = this;
-        var options = new RequestOptions({
-            headers: this.getHeaders()
-        });
-        return this.http
-            .post(this.apiUrl(path || 'bulk'), JSON.stringify({ items: models }), options)
-            .map(function (response) { return _this.extractPage(response, hack); });
+        options = options || {};
+        var subject = new Subject();
+        var request = this.http
+            .delete(this.apiUrl(id), { headers: this.getHeaders() })
+            .subscribe(function (dataModel) {
+            if (!subject.observers || !subject.observers.length) {
+                request.unsubscribe();
+                return;
+            }
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
+            if (isSuccess) {
+                return subject.next();
+            }
+            var err = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+            _this.handleError(err, subject);
+        }, function (err) { return _this.handleError(err, subject, request); });
+        return subject.asObservable();
+    };
+    GenericApi.prototype.post = function (data, field, options) {
+        var _this = this;
+        options = options || {};
+        var subject = new Subject();
+        var request = this.http
+            .post(this.apiUrl(field), JSON.stringify(data), { headers: this.getHeaders() })
+            .subscribe(function (dataModel) {
+            if (_this.shouldHandle(subject, request)) {
+                return;
+            }
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
+            if (isSuccess) {
+                subject.next(options.map ? options.map(dataModel.data) : dataModel.data);
+            }
+            var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+            _this.handleError(error, subject);
+        }, function (err) { return _this.handleError(err, subject, request); });
+        return subject.asObservable();
+    };
+    GenericApi.prototype.bulk = function (models, path, options) {
+        var _this = this;
+        options = options || {};
+        var subject = new Subject();
+        var request = this.http
+            .post(this.apiUrl(path || 'bulk'), JSON.stringify({ items: models }), { headers: this.getHeaders() })
+            .subscribe(function (response) {
+            try {
+                _this.extractPage(response, options, subject, request);
+            }
+            catch (err) {
+                _this.handleError(err, subject, request);
+            }
+        }, function (err) { return _this.handleError(err, subject, request); });
+        return subject.asObservable();
     };
     GenericApi.prototype.upload = function (file, path, query) {
+        var _this = this;
         var params = new URLSearchParams();
         for (var key in query) {
             if (query[key]) {
@@ -103,17 +171,18 @@ var GenericApi = /** @class */ (function () {
         var queryString = params.toString();
         var url = queryString ? this.apiUrl(path) + "?" + queryString : this.apiUrl(path);
         var headers = [];
-        this.getHeaders().forEach(function (values, name) {
-            if (name === 'Content-Type') {
-                return;
+        var httpHeaders = this.getHeaders();
+        for (var _i = 0, _a = httpHeaders.keys(); _i < _a.length; _i++) {
+            var name_1 = _a[_i];
+            var value = httpHeaders.get(name_1);
+            if (name_1 === 'Content-Type' || !value) {
+                continue;
             }
-            values.forEach(function (value) {
-                headers.push({
-                    name: name,
-                    value: value
-                });
+            headers.push({
+                name: name_1,
+                value: value
             });
-        });
+        }
         var uploader = new FileUploader({
             url: url,
             headers: headers,
@@ -124,18 +193,15 @@ var GenericApi = /** @class */ (function () {
         };
         var subject = new Subject();
         uploader.onErrorItem = function (item, response, status) {
-            subject.error(new Error('failed'));
+            var error = new Error('failed');
+            _this.handleError(error, subject);
         };
         uploader.onCompleteItem = function (item, response, status) {
             var dataModel = JSON.parse(response);
-            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
             if (!isSuccess) {
-                if (status === 200) {
-                    subject.error(dataModel.code || dataModel.message || 'failed');
-                }
-                else {
-                    subject.error('' + status);
-                }
+                var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                _this.handleError(error, subject);
             }
             else {
                 subject.next(dataModel.data);
@@ -144,11 +210,15 @@ var GenericApi = /** @class */ (function () {
         uploader.addToQueue([file]);
         return subject.asObservable();
     };
-    GenericApi.prototype.getHeaders = function () {
-        var headers = new Headers();
-        headers.append('Content-Type', 'application/json');
-        if (this.headers && this.headers.length > 0) {
-            this.headers.forEach(function (item) {
+    GenericApi.prototype.getHeaders = function (timeStamp) {
+        var headers = {
+            'Content-Type': 'application/json'
+        };
+        if (timeStamp) {
+            headers['If-Modified-Since'] = timeStamp.toISOString();
+        }
+        if (this.options.headers && this.options.headers.length > 0) {
+            this.options.headers.forEach(function (item) {
                 var value;
                 if (item.value) {
                     switch (typeof item.value) {
@@ -167,32 +237,36 @@ var GenericApi = /** @class */ (function () {
                     value = localStorage.getItem(item.key);
                 }
                 if (value) {
-                    headers.append(item.key, value + '');
+                    headers[item.key] = value;
                 }
             });
         }
-        return headers;
+        return new HttpHeaders(headers);
     };
     GenericApi.prototype.apiUrl = function (field) {
-        var key;
-        switch (typeof this.key) {
-            case 'string':
-                key = this.key;
-                break;
-            case 'function':
-                key = this.key();
-                break;
-            default:
-                key = JSON.stringify(this.key);
-                break;
+        var url = this.url;
+        if (this.options.collection) {
+            var key;
+            switch (typeof this.options.collection) {
+                case 'string':
+                    key = this.options.collection;
+                    break;
+                case 'function':
+                    key = this.options.collection();
+                    break;
+                default:
+                    key = JSON.stringify(this.options.collection);
+                    break;
+            }
+            url = url + "/" + key;
         }
-        var root = this.url + "/" + key;
         if (field) {
-            return this.extension ? root + "/" + field + this.extension : root + "/" + field;
+            url = url + "/" + field;
         }
-        else {
-            return this.extension ? "" + root + this.extension : "" + root;
+        if (this.options.extension) {
+            url = url + "." + this.options.extension;
         }
+        return url;
     };
     GenericApi.prototype.getSearchUrl = function (query, options) {
         var params = new URLSearchParams();
@@ -206,40 +280,47 @@ var GenericApi = /** @class */ (function () {
         var url = queryString ? this.apiUrl() + "?" + queryString : this.apiUrl();
         return url;
     };
-    GenericApi.prototype.extractModel = function (responseData, hack) {
-        if (responseData.status !== 200) {
-            throw new Error('This request has failed ' + responseData.status);
+    GenericApi.prototype.extractModel = function (dataModel, options, subject, request) {
+        options = options || {};
+        if (!this.shouldHandle(subject, request)) {
+            return;
         }
-        var dataModel = responseData.json();
-        var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
         if (!isSuccess) {
-            if (responseData.status === 200) {
-                throw new Error(dataModel.code || dataModel.message || 'failed');
-            }
-            else {
-                throw new Error(responseData.status);
-            }
+            var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+            return this.handleError(error, subject, request);
         }
-        return hack ? hack(dataModel.data) : dataModel.data;
+        if (options && options.map) {
+            return subject.next(options.map(dataModel.data));
+        }
+        if (this.options.map) {
+            return subject.next(this.options.map(dataModel.data));
+        }
+        return subject.next(dataModel.data);
     };
-    GenericApi.prototype.extractPage = function (responseData, hack) {
-        if (responseData.status !== 200) {
-            throw new Error('This request has failed ' + responseData.status);
+    GenericApi.prototype.extractPage = function (dataModel, options, subject, request) {
+        var _this = this;
+        if (!this.shouldHandle(subject, request)) {
+            return;
         }
-        var dataModel = responseData.json();
-        var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel['IsSuccess'];
+        options = options || {};
+        var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
         if (!isSuccess) {
-            if (responseData.status === 200) {
-                throw new Error(dataModel.code || dataModel.message || 'failed');
-            }
-            else {
-                throw new Error(responseData.status + '');
-            }
+            var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+            return this.handleError(error, subject);
         }
         var data = dataModel['data'] || dataModel;
         var items = [];
         data.items.forEach(function (item) {
-            items.push(hack ? hack(item) : item);
+            if (options.map) {
+                items.push(options.map(item));
+            }
+            else if (_this.options.map) {
+                items.push(_this.options.map(item));
+            }
+            else {
+                items.push(item);
+            }
         });
         var page = new Page();
         page.pageNo = data.pageNo;
@@ -247,9 +328,30 @@ var GenericApi = /** @class */ (function () {
         page.total = data.total;
         page.stats = data.stats;
         page.items = items;
-        return page;
+        return subject.next(page);
+    };
+    GenericApi.prototype.handleError = function (err, subject, request) {
+        if (!this.shouldHandle(subject, request)) {
+            return;
+        }
+        if (this.options.errorHandler) {
+            this.options.errorHandler.handleError(err);
+        }
+        subject.error(err);
+    };
+    GenericApi.prototype.shouldHandle = function (subject, request) {
+        if (!subject) {
+            return false;
+        }
+        if (!subject.observers || !subject.observers.length) {
+            if (request) {
+                request.unsubscribe();
+            }
+            return false;
+        }
+        return true;
     };
     return GenericApi;
 }());
 export { GenericApi };
-//# sourceMappingURL=generic-api.js.map
+//# sourceMappingURL=../src/dist/generic-api.js.map
