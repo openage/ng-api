@@ -1,6 +1,6 @@
 {
     "name": "@open-age/ng-api",
-    "version": "7.0.0",
+    "version": "7.1.0",
     "description": "set of classes to consume the restful api",
     "main": "./dist/index.js",
     "typings": "./dist/index.d.ts",
@@ -17,7 +17,8 @@
     "keywords": [
         "angular",
         "api",
-        "restful"
+        "restful",
+        "ng-api"
     ],
     "author": "Sunny Parkash <sunny.parkash@gmail.com> (https://github.com/sunnyparkash)",
     "license": "WTFPL",

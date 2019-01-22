@@ -30,11 +30,11 @@ export declare class GenericApi<TModel> implements IApi<TModel> {
         offline?: boolean;
         map?: (obj: any) => TModel;
     } | PageOptions): Observable<Page<TModel>>;
-    create(model: TModel, options?: {
+    create(model: any, options?: {
         offline?: boolean;
         map?: (obj: any) => TModel;
     }): Observable<TModel>;
-    update(id: number | string, model: TModel, options?: {
+    update(id: number | string, model: any, options?: {
         offline?: boolean;
         map?: (obj: any) => TModel;
     }): Observable<TModel>;

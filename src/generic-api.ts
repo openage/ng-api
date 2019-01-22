@@ -125,7 +125,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
                 err => this.handleError(err, subject, request))
         return subject.asObservable();
     }
-    public create(model: TModel, options?: {
+    public create(model: any, options?: {
         offline?: boolean,
         map?: (obj: any) => TModel
     }): Observable<TModel> {
@@ -140,7 +140,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
                 err => this.handleError(err, subject, request))
         return subject.asObservable();
     }
-    public update(id: number | string, model: TModel, options?: {
+    public update(id: number | string, model: any, options?: {
         offline?: boolean,
         map?: (obj: any) => TModel
     }): Observable<TModel> {

@@ -13,10 +13,10 @@ export interface IApi<TModel> {
         limit?: number,
         map?: (obj: any) => TModel
     } | PageOptions): Observable<Page<TModel>>;
-    create(model: TModel, options?: {
+    create(model: any, options?: {
         map?: (obj: any) => TModel
     }): Observable<TModel>;
-    update(id: number | string, model: TModel, options?: {
+    update(id: number | string, model: any, options?: {
         map?: (obj: any) => TModel
     }): Observable<TModel>;
     remove(id: number | string, options?: {
@@ -26,7 +26,7 @@ export interface IApi<TModel> {
     post(model: any, key?: string, options?: {
         map?: (obj: any) => any
     }): Observable<any>;
-    bulk(models: TModel[], path?: string, options?: {
+    bulk(models: any[], path?: string, options?: {
         map?: (obj: any) => any
     }): Observable<any>
     upload(file: File, path?: string, query?: any): Observable<any>;
