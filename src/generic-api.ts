@@ -193,7 +193,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
             .post<ServerData<any>>(this.apiUrl(field), JSON.stringify(data), { headers: this.getHeaders() })
             .subscribe(
                 dataModel => {
-                    if (this.shouldHandle(subject, request)) {
+                    if (!this.shouldHandle(subject, request)) {
                         return
                     }
                     const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;

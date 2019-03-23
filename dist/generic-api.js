@@ -132,7 +132,7 @@ var GenericApi = /** @class */ (function () {
         var request = this.http
             .post(this.apiUrl(field), JSON.stringify(data), { headers: this.getHeaders() })
             .subscribe(function (dataModel) {
-            if (_this.shouldHandle(subject, request)) {
+            if (!_this.shouldHandle(subject, request)) {
                 return;
             }
             var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
