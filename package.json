@@ -1,6 +1,6 @@
 {
     "name": "@open-age/ng-api",
-    "version": "7.1.1",
+    "version": "7.2.0",
     "description": "set of classes to consume the restful api",
     "main": "./dist/index.js",
     "typings": "./dist/index.d.ts",
@@ -26,17 +26,25 @@
         "url": "https://github.com/openage/ng-api/issues"
     },
     "homepage": "https://github.com/openage/ng-api#readme",
-    "dependencies": {
-        "@angular/common": "~7.1.0",
-        "@angular/core": "~7.1.0",
-        "@angular/http": "^7.1.0",
-        "@angular/platform-browser": "~7.1.0",
-        "moment": "^2.23.0",
+    "peerDependencies": {
+        "@angular/common": "~7.2.13",
+        "@angular/core": "~7.2.13",
+        "@angular/http": "^7.2.13",
+        "@angular/platform-browser": "~7.2.13",
+        "moment": "^2.24.0",
         "ng2-file-upload": "^1.3.0",
-        "rxjs": "^6.3.3",
-        "zone.js": "^0.8.27"
+        "rxjs": "^6.4.0",
+        "zone.js": "^0.9.0"
     },
     "devDependencies": {
-        "typescript": "^3.2.2"
+        "@angular/common": "~7.2.13",
+        "@angular/core": "~7.2.13",
+        "@angular/http": "^7.2.13",
+        "@angular/platform-browser": "~7.2.13",
+        "moment": "^2.24.0",
+        "ng2-file-upload": "^1.3.0",
+        "rxjs": "^6.4.0",
+        "zone.js": "^0.9.0",
+        "typescript": "^3.4.3"
     }
 }
