@@ -15,6 +15,19 @@ import moment from 'moment';
 
 export class GenericApi<TModel> implements IApi<TModel> {
 
+    private _createSubject = new Subject<TModel>();
+    private _removeSubject = new Subject<string | number>();
+    private _postSubject = new Subject<any>();
+    private _bulkSubject = new Subject<any>();
+    private _uploadSubject = new Subject<any>();
+
+
+    afterCreate = this._createSubject.asObservable();
+    afterRemove = this._removeSubject.asObservable();
+    afterPost = this._postSubject.asObservable();
+    afterBulk = this._bulkSubject.asObservable();
+    afterUpload = this._uploadSubject.asObservable();
+
     constructor(
         private http: HttpClient,
         private url: string,
@@ -136,7 +149,10 @@ export class GenericApi<TModel> implements IApi<TModel> {
         let request = this.http
             .post<ServerData<TModel>>(this.apiUrl(), JSON.stringify(model), { headers: this.getHeaders() })
             .subscribe(
-                response => this.extractModel(response, options, subject, request),
+                response => {
+                    let item = this.extractModel(response, options, subject, request);
+                    this._createSubject.next(item);
+                },
                 err => this.handleError(err, subject, request))
         return subject.asObservable();
     }
@@ -150,7 +166,10 @@ export class GenericApi<TModel> implements IApi<TModel> {
         let request = this.http
             .put<ServerData<TModel>>(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
             .subscribe(
-                response => this.extractModel(response, options, subject, request),
+                response => {
+                    let item = this.extractModel(response, options, subject, request);
+                    this._createSubject.next(item);
+                },
                 err => this.handleError(err, subject, request))
         return subject.asObservable();
     }
@@ -164,11 +183,16 @@ export class GenericApi<TModel> implements IApi<TModel> {
             .delete<RemoteData>(this.apiUrl(id), { headers: this.getHeaders() })
             .subscribe(
                 dataModel => {
+                    const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
+
+
+                    if (isSuccess) {
+                        this._removeSubject.next(id);
+                    }
                     if (!subject.observers || !subject.observers.length) {
                         request.unsubscribe();
                         return;
                     }
-                    const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
                     if (isSuccess) {
                         return subject.next();
                     }
@@ -193,16 +217,23 @@ export class GenericApi<TModel> implements IApi<TModel> {
             .post<ServerData<any>>(this.apiUrl(field), JSON.stringify(data), { headers: this.getHeaders() })
             .subscribe(
                 dataModel => {
-                    if (!this.shouldHandle(subject, request)) {
-                        return
-                    }
+                    let shouldHandle = this.shouldHandle(subject, request);
+
                     const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
 
-                    if (isSuccess) {
-                        subject.next(options.map ? options.map(dataModel.data) : dataModel.data)
+                    if (!isSuccess) {
+                        if (shouldHandle) {
+                            let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                            this.handleError(error, subject);
+                        }
+                        return;
                     }
-                    let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
-                    this.handleError(error, subject)
+                    let item = options.map ? options.map(dataModel.data) : dataModel.data
+
+                    this._postSubject.next(item)
+                    if (shouldHandle) {
+                        subject.next(item)
+                    }
                 },
                 err => this.handleError(err, subject, request))
         return subject.asObservable();
@@ -219,9 +250,10 @@ export class GenericApi<TModel> implements IApi<TModel> {
             .subscribe(
                 response => {
                     try {
-                        this.extractPage(response, options, subject, request)
+                        let page = this.extractPage(response, options, subject, request);
+                        this._bulkSubject.next(page);
                     } catch (err) {
-                        this.handleError(err, subject, request)
+                        this.handleError(err, subject, request);
                     }
                 },
                 err => this.handleError(err, subject, request))
@@ -277,9 +309,10 @@ export class GenericApi<TModel> implements IApi<TModel> {
 
             if (!isSuccess) {
                 let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
-                this.handleError(error, subject)
+                this.handleError(error, subject);
             } else {
-                subject.next(dataModel.data)
+                subject.next(dataModel.data);
+                this._uploadSubject.next(dataModel.data);
             }
         }
 
@@ -378,44 +411,52 @@ export class GenericApi<TModel> implements IApi<TModel> {
         dataModel: ServerData<TModel>,
         options: { map?: (obj: any) => TModel },
         subject: Subject<TModel>,
-        request: Subscription) {
+        request: Subscription): TModel {
         options = options || {}
 
-        if (!this.shouldHandle(subject, request)) {
-            return;
-        }
+        let shouldHandle = this.shouldHandle(subject, request)
 
         const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
         if (!isSuccess) {
             let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
-            return this.handleError(error, subject, request)
+
+            if (shouldHandle) {
+                this.handleError(error, subject, request)
+            }
+            return null;
         }
 
+        let model: TModel;
         if (options && options.map) {
-            return subject.next(options.map(dataModel.data))
+            model = options.map(dataModel.data)
+        } else if (this.options.map) {
+            model = this.options.map(dataModel.data)
+        } else {
+            model = dataModel.data as TModel;
         }
 
-        if (this.options.map) {
-            return subject.next(this.options.map(dataModel.data))
+        if (shouldHandle) {
+            subject.next(model);
         }
-
-        return subject.next(dataModel.data as TModel);
+        return model;
     }
 
     private extractPage(
         dataModel: Page<TModel>,
         options: { map?: (obj: any) => TModel },
         subject: Subject<Page<TModel>>,
-        request?: Subscription) {
+        request?: Subscription): Page<TModel> {
 
-        if (!this.shouldHandle(subject, request)) {
-            return;
-        }
+        let shouldHandle = this.shouldHandle(subject, request)
         options = options || {}
         const isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : (dataModel as any).IsSuccess;
         if (!isSuccess) {
-            let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
-            return this.handleError(error, subject)
+            if (shouldHandle) {
+                let error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed')
+                this.handleError(error, subject)
+            }
+
+            return
         }
 
         var data = (dataModel as any)['data'] || dataModel;
@@ -437,7 +478,10 @@ export class GenericApi<TModel> implements IApi<TModel> {
         page.stats = data.stats;
         page.items = items;
 
-        return subject.next(page)
+        if (shouldHandle) {
+            subject.next(page)
+        }
+        return page
     }
 
     private handleError(err: any, subject: Subject<any>, request?: Subscription) {

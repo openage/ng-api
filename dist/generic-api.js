@@ -9,6 +9,16 @@ var GenericApi = /** @class */ (function () {
         this.http = http;
         this.url = url;
         this.options = options;
+        this._createSubject = new Subject();
+        this._removeSubject = new Subject();
+        this._postSubject = new Subject();
+        this._bulkSubject = new Subject();
+        this._uploadSubject = new Subject();
+        this.afterCreate = this._createSubject.asObservable();
+        this.afterRemove = this._removeSubject.asObservable();
+        this.afterPost = this._postSubject.asObservable();
+        this.afterBulk = this._bulkSubject.asObservable();
+        this.afterUpload = this._uploadSubject.asObservable();
         this.options = this.options || {};
     }
     GenericApi.prototype.get = function (id, options) {
@@ -93,7 +103,10 @@ var GenericApi = /** @class */ (function () {
         var subject = new Subject();
         var request = this.http
             .post(this.apiUrl(), JSON.stringify(model), { headers: this.getHeaders() })
-            .subscribe(function (response) { return _this.extractModel(response, options, subject, request); }, function (err) { return _this.handleError(err, subject, request); });
+            .subscribe(function (response) {
+            var item = _this.extractModel(response, options, subject, request);
+            _this._createSubject.next(item);
+        }, function (err) { return _this.handleError(err, subject, request); });
         return subject.asObservable();
     };
     GenericApi.prototype.update = function (id, model, options) {
@@ -102,7 +115,10 @@ var GenericApi = /** @class */ (function () {
         var subject = new Subject();
         var request = this.http
             .put(this.apiUrl(id), JSON.stringify(model), { headers: this.getHeaders() })
-            .subscribe(function (response) { return _this.extractModel(response, options, subject, request); }, function (err) { return _this.handleError(err, subject, request); });
+            .subscribe(function (response) {
+            var item = _this.extractModel(response, options, subject, request);
+            _this._createSubject.next(item);
+        }, function (err) { return _this.handleError(err, subject, request); });
         return subject.asObservable();
     };
     GenericApi.prototype.remove = function (id, options) {
@@ -112,11 +128,14 @@ var GenericApi = /** @class */ (function () {
         var request = this.http
             .delete(this.apiUrl(id), { headers: this.getHeaders() })
             .subscribe(function (dataModel) {
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
+            if (isSuccess) {
+                _this._removeSubject.next(id);
+            }
             if (!subject.observers || !subject.observers.length) {
                 request.unsubscribe();
                 return;
             }
-            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
             if (isSuccess) {
                 return subject.next();
             }
@@ -132,15 +151,20 @@ var GenericApi = /** @class */ (function () {
         var request = this.http
             .post(this.apiUrl(field), JSON.stringify(data), { headers: this.getHeaders() })
             .subscribe(function (dataModel) {
-            if (!_this.shouldHandle(subject, request)) {
+            var shouldHandle = _this.shouldHandle(subject, request);
+            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
+            if (!isSuccess) {
+                if (shouldHandle) {
+                    var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                    _this.handleError(error, subject);
+                }
                 return;
             }
-            var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
-            if (isSuccess) {
-                subject.next(options.map ? options.map(dataModel.data) : dataModel.data);
+            var item = options.map ? options.map(dataModel.data) : dataModel.data;
+            _this._postSubject.next(item);
+            if (shouldHandle) {
+                subject.next(item);
             }
-            var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
-            _this.handleError(error, subject);
         }, function (err) { return _this.handleError(err, subject, request); });
         return subject.asObservable();
     };
@@ -152,7 +176,8 @@ var GenericApi = /** @class */ (function () {
             .post(this.apiUrl(path || 'bulk'), JSON.stringify({ items: models }), { headers: this.getHeaders() })
             .subscribe(function (response) {
             try {
-                _this.extractPage(response, options, subject, request);
+                var page = _this.extractPage(response, options, subject, request);
+                _this._bulkSubject.next(page);
             }
             catch (err) {
                 _this.handleError(err, subject, request);
@@ -205,6 +230,7 @@ var GenericApi = /** @class */ (function () {
             }
             else {
                 subject.next(dataModel.data);
+                _this._uploadSubject.next(dataModel.data);
             }
         };
         uploader.addToQueue([file]);
@@ -282,32 +308,41 @@ var GenericApi = /** @class */ (function () {
     };
     GenericApi.prototype.extractModel = function (dataModel, options, subject, request) {
         options = options || {};
-        if (!this.shouldHandle(subject, request)) {
-            return;
-        }
+        var shouldHandle = this.shouldHandle(subject, request);
         var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
         if (!isSuccess) {
             var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
-            return this.handleError(error, subject, request);
+            if (shouldHandle) {
+                this.handleError(error, subject, request);
+            }
+            return null;
         }
+        var model;
         if (options && options.map) {
-            return subject.next(options.map(dataModel.data));
+            model = options.map(dataModel.data);
         }
-        if (this.options.map) {
-            return subject.next(this.options.map(dataModel.data));
+        else if (this.options.map) {
+            model = this.options.map(dataModel.data);
         }
-        return subject.next(dataModel.data);
+        else {
+            model = dataModel.data;
+        }
+        if (shouldHandle) {
+            subject.next(model);
+        }
+        return model;
     };
     GenericApi.prototype.extractPage = function (dataModel, options, subject, request) {
         var _this = this;
-        if (!this.shouldHandle(subject, request)) {
-            return;
-        }
+        var shouldHandle = this.shouldHandle(subject, request);
         options = options || {};
         var isSuccess = dataModel.isSuccess !== undefined ? dataModel.isSuccess : dataModel.IsSuccess;
         if (!isSuccess) {
-            var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
-            return this.handleError(error, subject);
+            if (shouldHandle) {
+                var error = new Error(dataModel.error || dataModel.code || dataModel.message || 'failed');
+                this.handleError(error, subject);
+            }
+            return;
         }
         var data = dataModel['data'] || dataModel;
         var items = [];
@@ -328,7 +363,10 @@ var GenericApi = /** @class */ (function () {
         page.total = data.total;
         page.stats = data.stats;
         page.items = items;
-        return subject.next(page);
+        if (shouldHandle) {
+            subject.next(page);
+        }
+        return page;
     };
     GenericApi.prototype.handleError = function (err, subject, request) {
         if (!this.shouldHandle(subject, request)) {

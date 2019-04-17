@@ -8,6 +8,16 @@ export declare class GenericApi<TModel> implements IApi<TModel> {
     private http;
     private url;
     private options?;
+    private _createSubject;
+    private _removeSubject;
+    private _postSubject;
+    private _bulkSubject;
+    private _uploadSubject;
+    afterCreate: Observable<TModel>;
+    afterRemove: Observable<string | number>;
+    afterPost: Observable<any>;
+    afterBulk: Observable<any>;
+    afterUpload: Observable<any>;
     constructor(http: HttpClient, url: string, options?: {
         collection?: any;
         headers?: Array<{
