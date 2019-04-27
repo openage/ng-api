@@ -401,6 +401,15 @@ export class GenericApi<TModel> implements IApi<TModel> {
             }
         }
 
+        if (options) {
+            if (options.offset || options.limit) {
+                options.offset = options.offset || 0;
+                options.limit = options.limit || 10;
+                params.set('offset', options.offset.toString());
+                params.set('limit', options.limit.toString());
+            }
+        }
+
         const queryString = params.toString();
         const url = queryString ? `${this.apiUrl()}?${queryString}` : this.apiUrl();
 

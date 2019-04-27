@@ -302,6 +302,14 @@ var GenericApi = /** @class */ (function () {
                 params.set(key, query[key]);
             }
         }
+        if (options) {
+            if (options.offset || options.limit) {
+                options.offset = options.offset || 0;
+                options.limit = options.limit || 10;
+                params.set('offset', options.offset.toString());
+                params.set('limit', options.limit.toString());
+            }
+        }
         var queryString = params.toString();
         var url = queryString ? this.apiUrl() + "?" + queryString : this.apiUrl();
         return url;
