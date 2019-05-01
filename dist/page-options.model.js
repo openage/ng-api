@@ -1,18 +1,15 @@
 var PageOptions = /** @class */ (function () {
     function PageOptions(obj) {
-        this.offset = 0;
-        this.limit = 10;
         this.noPaging = false;
         if (!obj) {
             return;
         }
-        if (obj.offset) {
-            this.offset = obj.offset;
-        }
         if (obj.limit) {
             this.limit = obj.limit;
+            this.offset = obj.offset || 0;
+            this.noPaging = false;
         }
-        if (obj.noPaging) {
+        if (obj.noPaging !== undefined) {
             this.noPaging = obj.noPaging;
         }
     }
