@@ -88,7 +88,9 @@ var GenericApi = /** @class */ (function () {
         var headers = this.getHeaders();
         var pageOptions = new PageOptions({
             offset: options.offset,
-            limit: options.limit
+            limit: options.limit,
+            sort: options.sort,
+            desc: options.desc
         });
         var mapper = options instanceof PageOptions ? null : options.map;
         var subject = new Subject();
@@ -308,6 +310,12 @@ var GenericApi = /** @class */ (function () {
                 options.limit = options.limit || 10;
                 params.set('offset', options.offset.toString());
                 params.set('limit', options.limit.toString());
+            }
+            if (options.sort) {
+                params.set('sort', options.sort.toString());
+            }
+            if (options.desc !== undefined) {
+                params.set('desc', options.desc.toString());
             }
         }
         var queryString = params.toString();

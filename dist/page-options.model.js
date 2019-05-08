@@ -9,6 +9,8 @@ var PageOptions = /** @class */ (function () {
             this.offset = obj.offset || 0;
             this.noPaging = false;
         }
+        this.sort = obj.sort;
+        this.desc = obj.desc;
         if (obj.noPaging !== undefined) {
             this.noPaging = obj.noPaging;
         }

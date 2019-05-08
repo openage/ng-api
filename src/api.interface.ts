@@ -12,6 +12,8 @@ export interface IApi<TModel> {
     search(query?: any, options?: {
         offset?: number,
         limit?: number,
+        sort?: string,
+        desc?: boolean,
         map?: (obj: any) => TModel
     } | PageOptions): Observable<Page<TModel>>;
 

@@ -38,6 +38,8 @@ export declare class GenericApi<TModel> implements IApi<TModel> {
         offset?: number;
         limit?: number;
         offline?: boolean;
+        sort?: string;
+        desc?: boolean;
         map?: (obj: any) => TModel;
     } | PageOptions): Observable<Page<TModel>>;
     create(model: any, options?: {

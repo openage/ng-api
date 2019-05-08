@@ -1,6 +1,6 @@
 {
     "name": "@open-age/ng-api",
-    "version": "7.3.3",
+    "version": "7.4.0",
     "description": "set of classes to consume the restful api",
     "main": "./dist/index.js",
     "typings": "./dist/index.d.ts",

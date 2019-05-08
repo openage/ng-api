@@ -118,13 +118,17 @@ export class GenericApi<TModel> implements IApi<TModel> {
         offset?: number,
         limit?: number,
         offline?: boolean,
+        sort?: string,
+        desc?: boolean,
         map?: (obj: any) => TModel
     } | PageOptions): Observable<Page<TModel>> {
         options = options || {}
         let headers = this.getHeaders()
         let pageOptions = new PageOptions({
             offset: options.offset,
-            limit: options.limit
+            limit: options.limit,
+            sort: options.sort,
+            desc: options.desc
         });
 
         let mapper = options instanceof PageOptions ? null : options.map
@@ -408,7 +412,17 @@ export class GenericApi<TModel> implements IApi<TModel> {
                 params.set('offset', options.offset.toString());
                 params.set('limit', options.limit.toString());
             }
+
+            if (options.sort) {
+                params.set('sort', options.sort.toString());
+            }
+
+            if (options.desc !== undefined) {
+                params.set('desc', options.desc.toString());
+            }
         }
+
+
 
         const queryString = params.toString();
         const url = queryString ? `${this.apiUrl()}?${queryString}` : this.apiUrl();
