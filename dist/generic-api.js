@@ -300,7 +300,7 @@ var GenericApi = /** @class */ (function () {
         var params = new URLSearchParams();
         // tslint:disable-next-line:prefer-const
         for (var key in query) {
-            if (query[key]) {
+            if (query[key] !== undefined) {
                 params.set(key, query[key]);
             }
         }

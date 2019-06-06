@@ -1,15 +1,15 @@
 {
     "name": "@open-age/ng-api",
-    "version": "7.4.1",
+    "version": "7.4.2",
     "description": "set of classes to consume the restful api",
     "main": "./dist/index.js",
     "typings": "./dist/index.d.ts",
     "scripts": {
         "test": "test",
         "build": "tsc",
-        "release:major": "npm version major && git push origin master && npm publish --access public",
-        "release:minor": "npm version minor && git push origin master && npm publish --access public",
-        "release:patch": "npm version patch && git push origin master && npm publish --access public",
+        "release:major": "npm version major && npm publish --access public",
+        "release:minor": "npm version minor && npm publish --access public",
+        "release:patch": "npm version patch && npm publish --access public",
         "publish": "npm publish --access public"
     },
     "repository": {
