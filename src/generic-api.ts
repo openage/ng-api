@@ -400,7 +400,7 @@ export class GenericApi<TModel> implements IApi<TModel> {
         const params = new URLSearchParams();
         // tslint:disable-next-line:prefer-const
         for (let key in query) {
-            if (query[key]) {
+            if (query[key] !== undefined) {
                 params.set(key, query[key]);
             }
         }
